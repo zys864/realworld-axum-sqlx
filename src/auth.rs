@@ -50,8 +50,9 @@ where
 
     // Decode the user data
     let _token_data =
-        decode::<Claims>(bearer.token(), &KEYS.decoding, &Validation::default())
-            .map_err(|_| ErrorKind::TokenError)?;
-    
-    Ok(req.try_into_request().map_err(|_|ErrorKind::Unauthorized)?)
+        decode::<Claims>(bearer.token(), &KEYS.decoding, &Validation::default())?;
+
+    Ok(req
+        .try_into_request()
+        .map_err(|_| ErrorKind::Unauthorized)?)
 }

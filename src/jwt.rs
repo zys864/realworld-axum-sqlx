@@ -15,11 +15,12 @@ pub static KEYS: Lazy<Keys> = Lazy::new(|| {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    sub: String,
-    exp: i64,
+    /// email
+    pub sub: String,
+    pub exp: i64,
 }
 impl Claims {
-    pub fn new(email:String)->Self{
+    pub fn new(email: String) -> Self {
         let iat = chrono::Utc::now();
         let exp = iat + chrono::Duration::hours(24);
 
@@ -49,11 +50,14 @@ where
         let TypedHeader(Authorization(bearer)) =
             TypedHeader::<Authorization<Bearer>>::from_request(req)
                 .await
-                .map_err(|_| ErrorKind::TokenError)?;
+                .map_err(|_| {
+                    jsonwebtoken::errors::Error::from(
+                        jsonwebtoken::errors::ErrorKind::InvalidToken,
+                    )
+                })?;
         // Decode the user data
         let token_data =
-            decode::<Claims>(bearer.token(), &KEYS.decoding, &Validation::default())
-                .map_err(|_| ErrorKind::TokenError)?;
+            decode::<Claims>(bearer.token(), &KEYS.decoding, &Validation::default())?;
 
         Ok(token_data.claims)
     }

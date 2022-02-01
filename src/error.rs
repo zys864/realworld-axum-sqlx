@@ -11,10 +11,8 @@ use thiserror::Error;
 pub enum ErrorKind {
     #[error("not be authorized")]
     Unauthorized,
-    #[error("token value error")]
-    TokenError,
-    #[error("token value expired")]
-    TokenExpired,
+    #[error(transparent)]
+    TokenError(#[from] jsonwebtoken::errors::Error),
     #[error("Duplicated email: {}", 0)]
     DuplicatedEmail(String),
     #[error(transparent)]
@@ -32,23 +30,14 @@ impl IntoResponse for ErrorKind {
                 .status(StatusCode::UNAUTHORIZED)
                 .body(body::boxed(body::Empty::new()))
                 .unwrap(),
-            ErrorKind::TokenError => {
-                let errors_info = vec!["TokenError".to_string()];
-                let errors = ErrorRespinse::new(errors_info);
-                Response::builder()
-                    .status(StatusCode::UNPROCESSABLE_ENTITY)
-                    .header(
-                        header::CONTENT_TYPE,
-                        header::HeaderValue::from_str("application/json").unwrap(),
-                    )
-                    .body(body::boxed(body::Full::from(
-                        serde_json::to_string(&errors).unwrap(),
-                    )))
-                    .unwrap()
-            }
-            ErrorKind::TokenExpired => {
-                let errors_info = vec!["TokenExpired".to_string()];
-                let errors = ErrorRespinse::new(errors_info);
+            ErrorKind::TokenError(e) => {
+                let errors_info = match e.kind() {
+                    jsonwebtoken::errors::ErrorKind::InvalidToken => "InvalidToken",
+                    jsonwebtoken::errors::ErrorKind::ExpiredSignature => "ExpiredToken",
+                    _ => "other token error",
+                }
+                .to_string();
+                let errors = ErrorResponse::new(vec![errors_info]);
                 Response::builder()
                     .status(StatusCode::UNPROCESSABLE_ENTITY)
                     .header(
@@ -62,7 +51,7 @@ impl IntoResponse for ErrorKind {
             }
             ErrorKind::DuplicatedEmail(s) => {
                 let errors_info = vec![format!("Duplicated email: {}", s)];
-                let errors = ErrorRespinse::new(errors_info);
+                let errors = ErrorResponse::new(errors_info);
                 Response::builder()
                     .status(StatusCode::UNPROCESSABLE_ENTITY)
                     .header(
@@ -77,7 +66,7 @@ impl IntoResponse for ErrorKind {
             ErrorKind::FiledValidate(e) => {
                 let errors_info: Vec<String> =
                     e.to_string().split("\n").map(|x| x.to_string()).collect();
-                let errors = ErrorRespinse::new(errors_info);
+                let errors = ErrorResponse::new(errors_info);
                 Response::builder()
                     .status(StatusCode::UNPROCESSABLE_ENTITY)
                     .header(
@@ -91,7 +80,7 @@ impl IntoResponse for ErrorKind {
             }
             ErrorKind::SqlError(_) | ErrorKind::EncripyError(_) => {
                 let errors_info = vec!["Internel server error".to_string()];
-                let errors = ErrorRespinse::new(errors_info);
+                let errors = ErrorResponse::new(errors_info);
                 Response::builder()
                     .status(StatusCode::UNPROCESSABLE_ENTITY)
                     .header(
@@ -107,14 +96,14 @@ impl IntoResponse for ErrorKind {
     }
 }
 #[derive(Debug, Serialize)]
-pub struct ErrorRespinse {
+pub struct ErrorResponse {
     errors: ErrorResponseBody,
 }
 #[derive(Debug, Serialize)]
 pub struct ErrorResponseBody {
     body: Vec<String>,
 }
-impl ErrorRespinse {
+impl ErrorResponse {
     pub fn new<T: AsRef<[String]>>(errors: T) -> Self {
         Self {
             errors: ErrorResponseBody {

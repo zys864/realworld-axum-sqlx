@@ -12,7 +12,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
     let db = db::db().await;
 
-    let middleware = ServiceBuilder::new().add_extension(db);
+    let middleware = ServiceBuilder::new().trace_for_http().add_extension(db);
     let app = handler::app().layer(middleware);
 
     axum::Server::bind(&"127.0.0.1:3000".parse().unwrap())
