@@ -1,24 +1,25 @@
-# Developing !!! not work
-# ![RealWorld Example App](logo.png) 
-
-> ### [YOUR_FRAMEWORK] codebase containing real world examples (CRUD, auth, advanced patterns, etc) that adheres to the [RealWorld](https://github.com/gothinkster/realworld) spec and API.
-
-
-### [Demo](https://demo.realworld.io/)&nbsp;&nbsp;&nbsp;&nbsp;[RealWorld](https://github.com/gothinkster/realworld)
-
-
-This codebase was created to demonstrate a fully fledged fullstack application built with **[YOUR_FRAMEWORK]** including CRUD operations, authentication, routing, pagination, and more.
-
-We've gone to great lengths to adhere to the **[YOUR_FRAMEWORK]** community styleguides & best practices.
+# Developing !!! currently,only users api work
+# RealWorld demo : Rust + Axum + Sqlx + Postgres
 
 For more information on how to this works with other frontends/backends, head over to the [RealWorld](https://github.com/gothinkster/realworld) repo.
 
 
-# How it works
+# Cargo build
 
-> Describe the general architecture of your app here
+> Change postgres database url in .env file 
+>
+> Run `cargo install sqlx-cli` if not install it
+>
+> run sqlx command to migration database model then build the project
+```shell
+    sqlx database create 
+    sqlx migrate run
+    cargo run --release
+```
 
-# Getting started
 
-> npm install, npm start, etc.
+
+# Docker
+
+> developing
 
