@@ -6,6 +6,7 @@ use axum::{
 use http::header;
 use serde::Serialize;
 use thiserror::Error;
+
 #[derive(Debug, Error)]
 pub enum ErrorKind {
     #[error("not be authorized")]
@@ -14,27 +15,14 @@ pub enum ErrorKind {
     TokenError,
     #[error("token value expired")]
     TokenExpired,
-    #[error("request json filed is invalided")]
-    FiledValidate(Vec<String>),
-    #[error("sqlx error")]
+    #[error("Duplicated email: {}", 0)]
+    DuplicatedEmail(String),
+    #[error(transparent)]
+    FiledValidate(#[from] validator::ValidationError),
+    #[error(transparent)]
     SqlError(#[from] sqlx::Error),
-}
-impl ErrorKind {
-    pub fn unauthorized() -> Self {
-        Self::Unauthorized
-    }
-    pub fn token_error() -> Self {
-        Self::TokenError
-    }
-    pub fn token_expired() -> Self {
-        Self::TokenExpired
-    }
-    pub fn filed_validate<T: AsRef<[String]>>(e: T) -> Self {
-        Self::FiledValidate(e.as_ref().to_vec())
-    }
-    pub fn sql_error(e: sqlx::Error) -> Self {
-        Self::SqlError(e)
-    }
+    #[error(transparent)]
+    EncripyError(#[from] argon2::Error),
 }
 pub type IResult<T> = Result<T, ErrorKind>;
 impl IntoResponse for ErrorKind {
@@ -72,7 +60,8 @@ impl IntoResponse for ErrorKind {
                     )))
                     .unwrap()
             }
-            ErrorKind::FiledValidate(errors_info) => {
+            ErrorKind::DuplicatedEmail(s) => {
+                let errors_info = vec![format!("Duplicated email: {}", s)];
                 let errors = ErrorRespinse::new(errors_info);
                 Response::builder()
                     .status(StatusCode::UNPROCESSABLE_ENTITY)
@@ -85,7 +74,22 @@ impl IntoResponse for ErrorKind {
                     )))
                     .unwrap()
             }
-            ErrorKind::SqlError(_) => {
+            ErrorKind::FiledValidate(e) => {
+                let errors_info: Vec<String> =
+                    e.to_string().split("\n").map(|x| x.to_string()).collect();
+                let errors = ErrorRespinse::new(errors_info);
+                Response::builder()
+                    .status(StatusCode::UNPROCESSABLE_ENTITY)
+                    .header(
+                        header::CONTENT_TYPE,
+                        header::HeaderValue::from_str("application/json").unwrap(),
+                    )
+                    .body(body::boxed(body::Full::from(
+                        serde_json::to_string(&errors).unwrap(),
+                    )))
+                    .unwrap()
+            }
+            ErrorKind::SqlError(_) | ErrorKind::EncripyError(_) => {
                 let errors_info = vec!["Internel server error".to_string()];
                 let errors = ErrorRespinse::new(errors_info);
                 Response::builder()

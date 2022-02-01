@@ -1,10 +1,10 @@
-use sqlx::PgPool;
 use argon2::{self, Config, ThreadMode, Variant, Version};
 use once_cell::sync::Lazy;
+use sqlx::PgPool;
 
 pub async fn db() -> PgPool {
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL env not be setted");
+    let database_url =
+        std::env::var("DATABASE_URL").expect("DATABASE_URL env not be setted");
     PgPool::connect(&database_url).await.unwrap()
 }
 
@@ -24,26 +24,18 @@ static SALT: Lazy<String> = Lazy::new(|| {
         // .expect("salt env not be seted");
         .unwrap_or("db9ddb9ddb9d".to_string())
 });
-pub fn hash(
-    password: impl AsRef<str>,
-) -> argon2::Result<String> {
+pub fn hash(password: impl AsRef<str>) -> argon2::Result<String> {
     argon2::hash_encoded(
         password.as_ref().as_bytes(),
         &SALT.as_bytes(),
         &ARGON2_CONFIG,
     )
 }
-pub fn verify_hash<T>(
-    password: T,
-    hash: T,
-) -> argon2::Result<bool>
+pub fn verify_hash<T>(password: T, hash: T) -> argon2::Result<bool>
 where
     T: AsRef<str>,
 {
-    argon2::verify_encoded(
-        &hash.as_ref(),
-        password.as_ref().as_bytes(),
-    )
+    argon2::verify_encoded(&hash.as_ref(), password.as_ref().as_bytes())
 }
 
 #[cfg(test)]
@@ -53,10 +45,8 @@ mod tests {
     #[test]
     fn test_hash() {
         let password = "password".to_string();
-        let hashed_password =
-            hash(password.clone()).unwrap();
-        let match_result =
-            verify_hash(password, hashed_password).unwrap();
+        let hashed_password = hash(password.clone()).unwrap();
+        let match_result = verify_hash(password, hashed_password).unwrap();
         assert!(match_result)
     }
 }
