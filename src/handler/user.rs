@@ -1,6 +1,7 @@
 use crate::{
     db::{hash, verify_hash},
     error::ErrorKind,
+    jwt::generate_jwt_token,
 };
 use axum::{extract::Extension, Json};
 use axum_debug::debug_handler;
@@ -67,8 +68,12 @@ pub async fn create_user(
     .await
     .map_err(|e| ErrorKind::SqlError(e))?;
     tracing::debug!("insert return id: {:#?}", &_id);
+    let claims = crate::jwt::Claims::new(user_create.email.clone());
+                let token =
+                    generate_jwt_token(claims).map_err(|_e| ErrorKind::TokenError)?;
     let user_info = response_type::User {
         username: user_create.username,
+        token:token,
         email: user_create.email,
         bio: None,
         image: None,
@@ -112,8 +117,12 @@ pub async fn login_user(
             let is_auth = verify_hash(password, record.hashed_password)
                 .map_err(|_| ErrorKind::Unauthorized)?;
             if is_auth {
+                let claims = crate::jwt::Claims::new(record.email.clone());
+                let token =
+                    generate_jwt_token(claims).map_err(|_e| ErrorKind::TokenError)?;
                 let user_info = response_type::User {
                     username: record.username,
+                    token: token,
                     email: record.email,
                     bio: None,
                     image: None,

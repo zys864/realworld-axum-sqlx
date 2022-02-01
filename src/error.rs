@@ -18,7 +18,7 @@ pub enum ErrorKind {
     #[error("Duplicated email: {}", 0)]
     DuplicatedEmail(String),
     #[error(transparent)]
-    FiledValidate(#[from] validator::ValidationError),
+    FiledValidate(#[from] validator::ValidationErrors),
     #[error(transparent)]
     SqlError(#[from] sqlx::Error),
     #[error(transparent)]

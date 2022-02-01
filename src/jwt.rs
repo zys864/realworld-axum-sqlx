@@ -16,11 +16,18 @@ pub static KEYS: Lazy<Keys> = Lazy::new(|| {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     sub: String,
-    name: String,
-    exp: usize,
+    exp: i64,
 }
-pub struct JwtAuth {
-    token: String,
+impl Claims {
+    pub fn new(email:String)->Self{
+        let iat = chrono::Utc::now();
+        let exp = iat + chrono::Duration::hours(24);
+
+        Self {
+            sub: email,
+            exp: chrono::DateTime::timestamp(&exp),
+        }
+    }
 }
 pub fn generate_jwt_token(claims: Claims) -> jsonwebtoken::errors::Result<String> {
     // Create the authorization token
@@ -30,7 +37,6 @@ pub fn generate_jwt_token(claims: Claims) -> jsonwebtoken::errors::Result<String
         &KEYS.encoding,
     )?)
 }
-
 #[async_trait]
 impl<B> FromRequest<B> for Claims
 where
