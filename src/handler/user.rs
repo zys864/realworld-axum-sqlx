@@ -3,13 +3,16 @@ use crate::{
     error::ErrorKind,
     jwt::{generate_jwt_token, Claims},
 };
-use axum::{extract::Extension, Json};
+use axum::{
+    extract::{Extension, TypedHeader},
+    Json,
+};
 use axum_debug::debug_handler;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use validator::Validate;
 
-use crate::{error::IResult, response_type};
+use crate::{error::Result, response_type};
 #[derive(Debug, Deserialize, Validate)]
 pub struct UserCreate {
     #[validate(length(min = 6, max = 20))]
@@ -27,7 +30,7 @@ pub struct UserCreateRequest {
 pub async fn create_user(
     Json(user_create_request): Json<UserCreateRequest>,
     Extension(db): Extension<PgPool>,
-) -> IResult<Json<response_type::UserAuthResponse>> {
+) -> Result<Json<response_type::UserAuthResponse>> {
     let user_create = user_create_request.user;
     // determine user create info validation
     user_create.validate()?;
@@ -53,7 +56,7 @@ pub async fn create_user(
         r#"
             INSERT INTO user_info(username,email,hashed_password)
             VALUES ($1,$2,$3)
-            RETURNING id
+            RETURNING user_id
         "#,
         &user_create.username,
         &user_create.email,
@@ -65,7 +68,7 @@ pub async fn create_user(
     let token = generate_jwt_token(claims)?;
     let user_info = response_type::User {
         username: user_create.username,
-        token: token,
+        token,
         email: user_create.email,
         bio: None,
         image: None,
@@ -73,7 +76,7 @@ pub async fn create_user(
     let user_response = response_type::UserAuthResponse { user: user_info };
     Ok(Json(user_response))
 }
-
+// *****************************************************************************
 /// Login user
 ///
 #[derive(Debug, Deserialize)]
@@ -90,7 +93,7 @@ pub struct LoginUserResquest {
 pub async fn login_user(
     Json(user_login): Json<LoginUserResquest>,
     Extension(db): Extension<PgPool>,
-) -> IResult<Json<response_type::UserAuthResponse>> {
+) -> Result<Json<response_type::UserAuthResponse>> {
     let LoginUser { email, password } = user_login.user;
 
     let res = sqlx::query!(
@@ -111,7 +114,7 @@ pub async fn login_user(
                 let token = generate_jwt_token(claims)?;
                 let user_info = response_type::User {
                     username: record.username,
-                    token: token,
+                    token,
                     email: record.email,
                     bio: None,
                     image: None,
@@ -125,27 +128,41 @@ pub async fn login_user(
         None => Err(ErrorKind::Unauthorized),
     }
 }
+
+// *****************************************************************************
+
 #[debug_handler]
 pub async fn get_current_user(
     claims: Claims,
+    TypedHeader(bearer): TypedHeader<
+        axum::headers::Authorization<axum::headers::authorization::Bearer>,
+    >,
     Extension(db): Extension<PgPool>,
-) -> Result<Json<response_type::ProfileResponse>, ErrorKind> {
+) -> Result<Json<response_type::UserAuthResponse>> {
+    let token = bearer.token().to_string();
     let user_email = claims.sub; // email
-    tracing::debug!("{}", &user_email);
-    let user = sqlx::query_as!(
-        response_type::Profile,
+    let record = sqlx::query!(
         r#"
-        SELECT email,username,bio,image
+        SELECT username,bio,image
         FROM user_info
         WHERE email=$1
         "#,
-        user_email,
+        &user_email,
     )
     .fetch_one(&db)
     .await?;
-    let user_response = response_type::ProfileResponse { user };
+    let user = response_type::User {
+        username: record.username,
+        token,
+        email: user_email,
+        bio: record.bio,
+        image: record.image,
+    };
+    let user_response = response_type::UserAuthResponse { user };
     Ok(Json(user_response))
 }
+
+// *****************************************************************************
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct UpdateUser {
@@ -170,7 +187,7 @@ pub async fn update_user(
     _claims: Claims,
     Json(update_user_info): Json<UpdateUserRequest>,
     Extension(db): Extension<PgPool>,
-) -> Result<Json<response_type::UserAuthResponse>, ErrorKind> {
+) -> Result<Json<response_type::UserAuthResponse>> {
     let update_user = update_user_info.user;
     // determine user create info validation
     update_user.validate()?;
@@ -180,13 +197,11 @@ pub async fn update_user(
     // insert into sql
     let _id = sqlx::query!(
         r#"
-            INSERT INTO user_info(username,email,hashed_password,bio,image)
-            VALUES ($1,$2,$3,$4,$5)
-            RETURNING id
+            UPDATE user_info SET username=$1,email=$2,hashed_password=$3,bio=$4,image=$5
         "#,
         update_user.username,
         update_user.email,
-        hashed_password,
+        hash(hashed_password)?,
         update_user.bio,
         update_user.image
     )
@@ -196,7 +211,7 @@ pub async fn update_user(
     let token = generate_jwt_token(claims)?;
     let user_info = response_type::User {
         username: update_user.username,
-        token: token,
+        token,
         email: update_user.email,
         bio: None,
         image: None,

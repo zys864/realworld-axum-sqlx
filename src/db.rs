@@ -8,6 +8,8 @@ pub async fn db() -> PgPool {
     PgPool::connect(&database_url).await.unwrap()
 }
 
+// encrypt
+
 static ARGON2_CONFIG: Lazy<Config> = Lazy::new(|| Config {
     variant: Variant::Argon2i,
     version: Version::Version13,
@@ -22,12 +24,12 @@ static ARGON2_CONFIG: Lazy<Config> = Lazy::new(|| Config {
 static SALT: Lazy<String> = Lazy::new(|| {
     std::env::var("SALT")
         // .expect("salt env not be seted");
-        .unwrap_or("db9ddb9ddb9d".to_string())
+        .unwrap_or_else(|_| "db9ddb9ddb9d".to_string())
 });
 pub fn hash(password: impl AsRef<str>) -> argon2::Result<String> {
     argon2::hash_encoded(
         password.as_ref().as_bytes(),
-        &SALT.as_bytes(),
+        SALT.as_bytes(),
         &ARGON2_CONFIG,
     )
 }
@@ -35,7 +37,7 @@ pub fn verify_hash<T>(password: T, hash: T) -> argon2::Result<bool>
 where
     T: AsRef<str>,
 {
-    argon2::verify_encoded(&hash.as_ref(), password.as_ref().as_bytes())
+    argon2::verify_encoded(hash.as_ref(), password.as_ref().as_bytes())
 }
 
 #[cfg(test)]

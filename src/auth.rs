@@ -56,3 +56,20 @@ where
         .try_into_request()
         .map_err(|_| ErrorKind::Unauthorized)?)
 }
+
+pub fn is_auth(headers: axum::headers::HeaderMap) -> Result<Claims, ErrorKind> {
+    let bearer = headers
+        .get("Authorization")
+        .ok_or(ErrorKind::Unauthorized)?
+        .to_str()
+        .map_err(|_| ErrorKind::Unauthorized)?;
+    if !bearer.starts_with("Bearer") {
+        return Err(ErrorKind::Unauthorized);
+    }
+    let token = bearer
+        .split_ascii_whitespace()
+        .nth(1)
+        .ok_or(ErrorKind::Unauthorized)?;
+    let token_data = decode::<Claims>(token, &KEYS.decoding, &Validation::default())?;
+    Ok(token_data.claims)
+}

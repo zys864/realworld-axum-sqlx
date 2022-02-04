@@ -6,7 +6,7 @@ use axum::{
 use http::header;
 use serde::Serialize;
 use thiserror::Error;
-
+pub type Result<T> = std::result::Result<T, ErrorKind>;
 #[derive(Debug, Error)]
 pub enum ErrorKind {
     #[error("not be authorized")]
@@ -22,7 +22,6 @@ pub enum ErrorKind {
     #[error(transparent)]
     EncripyError(#[from] argon2::Error),
 }
-pub type IResult<T> = Result<T, ErrorKind>;
 impl IntoResponse for ErrorKind {
     fn into_response(self) -> Response {
         match self {
@@ -65,7 +64,7 @@ impl IntoResponse for ErrorKind {
             }
             ErrorKind::FiledValidate(e) => {
                 let errors_info: Vec<String> =
-                    e.to_string().split("\n").map(|x| x.to_string()).collect();
+                    e.to_string().split('\n').map(|x| x.to_string()).collect();
                 let errors = ErrorResponse::new(errors_info);
                 Response::builder()
                     .status(StatusCode::UNPROCESSABLE_ENTITY)

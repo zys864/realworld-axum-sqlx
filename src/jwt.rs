@@ -32,11 +32,7 @@ impl Claims {
 }
 pub fn generate_jwt_token(claims: Claims) -> jsonwebtoken::errors::Result<String> {
     // Create the authorization token
-    Ok(jsonwebtoken::encode(
-        &Header::default(),
-        &claims,
-        &KEYS.encoding,
-    )?)
+    jsonwebtoken::encode(&Header::default(), &claims, &KEYS.encoding)
 }
 #[async_trait]
 impl<B> FromRequest<B> for Claims
@@ -63,17 +59,16 @@ where
     }
 }
 
-#[derive(Debug)]
 pub struct Keys {
     pub encoding: EncodingKey,
-    pub decoding: DecodingKey<'static>,
+    pub decoding: DecodingKey,
 }
 
 impl Keys {
     pub fn new(secret: &[u8]) -> Self {
         Self {
             encoding: EncodingKey::from_secret(secret),
-            decoding: DecodingKey::from_secret(secret).into_static(),
+            decoding: DecodingKey::from_secret(secret),
         }
     }
 }

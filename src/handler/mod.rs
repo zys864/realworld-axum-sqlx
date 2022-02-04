@@ -3,6 +3,7 @@ use axum::{
     Router,
 };
 
+pub mod article;
 pub mod user;
 pub fn app() -> Router {
     Router::new()
