@@ -7,7 +7,7 @@ use axum::{
     extract::{Extension, TypedHeader},
     Json,
 };
-use axum_debug::debug_handler;
+use axum_macros::debug_handler;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use validator::Validate;

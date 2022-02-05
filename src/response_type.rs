@@ -48,7 +48,7 @@ pub struct Article {
 }
 #[derive(Debug, Serialize)]
 pub struct ArticleResponse {
-    article: Article,
+    pub article: Article,
 }
 #[derive(Debug, Serialize)]
 pub struct ArticlesResponse {

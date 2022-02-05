@@ -157,11 +157,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum-debug"
-version = "0.3.2"
+name = "axum-macros"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9db5dc4828d357f9b15df085afe0271d26d3a831c01361260e73bfbbb327b8f"
+checksum = "11227b1a87dc0f86992e3f0774da56aed9f38e9d307abbb546b7754027912979"
 dependencies = [
+ "heck 0.4.0",
  "proc-macro2",
  "quote",
  "syn",
@@ -552,6 +553,12 @@ checksum = "6d621efb26863f0e9924c6ac577e8275e5e6b77455db64ffa6c65c904e9e132c"
 dependencies = [
  "unicode-segmentation",
 ]
+
+[[package]]
+name = "heck"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2540771e65fc8cb83cd6e8a237f70c319bd5c29f78ed1084ba5d50eeac86f7f9"
 
 [[package]]
 name = "hermit-abi"
@@ -1099,7 +1106,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "axum-debug",
+ "axum-macros",
  "chrono",
  "dotenv",
  "futures-util",
@@ -1450,7 +1457,7 @@ checksum = "38e45140529cf1f90a5e1c2e561500ca345821a1c513652c8f486bbf07407cc8"
 dependencies = [
  "dotenv",
  "either",
- "heck",
+ "heck 0.3.3",
  "hex",
  "once_cell",
  "proc-macro2",

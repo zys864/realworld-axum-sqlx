@@ -30,3 +30,18 @@ $$
         user_info.user_id = id   
 $$
 LANGUAGE SQL;
+CREATE OR REPLACE FUNCTION get_user_base_info_by_user_email(email TEXT) RETURNS
+TABLE (
+    username TEXT,
+    bio TEXT,
+    image TEXT
+) AS
+$$
+    SELECT
+        username,bio,image
+    FROM 
+        user_info
+    WHERE
+        user_info.email = email   
+$$
+LANGUAGE SQL;
