@@ -1,20 +1,13 @@
-use axum::body::Body;
-use axum::body::Bytes;
-use axum::headers::HeaderMap;
-use http::Request;
-
-use std::time::Duration;
-use tower::ServiceBuilder;
-use tower_http::ServiceBuilderExt;
+use http_server::http_server;
+use metrics_server::metrics_server;
 use utils::log_utils::log_init;
-
-use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
-use tracing::Span;
 
 pub mod auth;
 pub mod db;
 pub mod error;
 pub mod handler;
+pub mod http_server;
+pub mod metrics_server;
 pub mod response_type;
 pub mod utils;
 
@@ -23,54 +16,8 @@ pub type DbPool = sqlx::PgPool;
 async fn main() {
     dotenvy::dotenv().ok();
     let _guard = log_init();
-    let db = db::db().await;
-
-    let middleware = ServiceBuilder::new()
-        // .timeout(std::time::Duration::from_secs(10))
-        .compression()
-        .trim_trailing_slash()
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(|_request: &Request<Body>| {
-                    tracing::info_span!("http-request")
-                })
-                .on_request(|request: &Request<Body>, _span: &Span| {
-                    tracing::info!(
-                        "started {} {:?} {}",
-                        request.method(),
-                        request.headers(),
-                        request.uri().path()
-                    )
-                })
-                .on_response(
-                    // |response: &Response<Body>, latency: Duration, _span: &Span| {
-                    //     tracing::debug!("response generated in {:?}", latency)
-                    // },
-                    (),
-                )
-                .on_body_chunk(|chunk: &Bytes, _latency: Duration, _span: &Span| {
-                    tracing::debug!("sending {} bytes", chunk.len())
-                })
-                .on_eos(
-                    |_trailers: Option<&HeaderMap>,
-                     stream_duration: Duration,
-                     _span: &Span| {
-                        tracing::debug!("stream closed after {:?}", stream_duration)
-                    },
-                )
-                .on_failure(
-                    |error: ServerErrorsFailureClass,
-                     _latency: Duration,
-                     _span: &Span| {
-                        tracing::error!(msg = "something went wrong",?error)
-                    },
-                ),
-        );
-    let app = handler::app_router(db).layer(middleware);
-    tracing::info!("listening host 127.0.0.1:3000");
-    axum::Server::bind(&"127.0.0.1:3000".parse().unwrap())
-        .serve(app.into_make_service())
-        .with_graceful_shutdown(utils::graceful_shutdown::shutdown_signal())
-        .await
-        .unwrap();
+    // The `/metrics` endpoint should not be publicly available. If behind a reverse proxy, this
+    // can be achieved by rejecting requests to `/metrics`. In this example, a second server is
+    // started on another port to expose `/metrics`.
+    let (_main_server, _metrics_server) = tokio::join!(http_server(), metrics_server());
 }

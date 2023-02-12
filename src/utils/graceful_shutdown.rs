@@ -1,7 +1,6 @@
-
 use tokio::signal;
-
-pub async fn shutdown_signal() {
+#[track_caller]
+pub async fn shutdown_signal(name: &str) {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -24,5 +23,5 @@ pub async fn shutdown_signal() {
         _ = terminate => {},
     }
 
-    tracing::warn!(msg = "signal received, starting graceful shutdown");
+    tracing::warn!("signal received,'{}' starting graceful shutdown", name);
 }
