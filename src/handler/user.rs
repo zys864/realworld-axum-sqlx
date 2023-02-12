@@ -92,15 +92,19 @@ pub struct LoginUserResquest {
 }
 
 #[debug_handler]
+#[tracing::instrument(skip_all)]
 pub async fn login_user(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<LoginUserResquest>,
 ) -> Result<Json<response_type::UserAuthResponse>> {
     // Check if the user sent the credentials
     let LoginUser { email, password } = payload.user;
+    tracing::info!("[user: {}],attempt login ",email);
     if email.is_empty() || password.is_empty() {
+        tracing::info!("[user: {}],failed to login, the email or password is empty",email);
         return Err(ErrorKind::Unauthorized);
     }
+    
     // Here you can check the user credentials from a database
     let res = sqlx::query!(
         r#"
@@ -126,12 +130,17 @@ pub async fn login_user(
                     image: None,
                 };
                 let user_response = response_type::UserAuthResponse { user: user_info };
+                tracing::info!("[user: {}],successful to login ",email);
                 Ok(Json(user_response))
             } else {
+                tracing::info!("user: {},failed to login ",email);
                 Err(ErrorKind::Unauthorized)
             }
         }
-        None => Err(ErrorKind::Unauthorized),
+        None =>{ 
+            tracing::info!("[user: {}],the user don't existed ",email);
+            Err(ErrorKind::Unauthorized)
+        },
     }
 }
 

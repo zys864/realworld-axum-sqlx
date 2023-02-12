@@ -3,7 +3,7 @@
 # dependencies
 /node_modules
 /dist
-
+logs/
 # IDEs and editors
 /.idea
 .project
