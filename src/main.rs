@@ -59,10 +59,10 @@ async fn main() {
                     },
                 )
                 .on_failure(
-                    |_error: ServerErrorsFailureClass,
+                    |error: ServerErrorsFailureClass,
                      _latency: Duration,
                      _span: &Span| {
-                        tracing::debug!("something went wrong")
+                        tracing::error!(msg = "something went wrong",?error)
                     },
                 ),
         );
@@ -70,6 +70,7 @@ async fn main() {
     tracing::info!("listening host 127.0.0.1:3000");
     axum::Server::bind(&"127.0.0.1:3000".parse().unwrap())
         .serve(app.into_make_service())
+        .with_graceful_shutdown(utils::graceful_shutdown::shutdown_signal())
         .await
         .unwrap();
 }

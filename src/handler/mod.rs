@@ -34,5 +34,12 @@ pub struct AppState {
 }
 
 async fn handler_404() -> impl axum::response::IntoResponse {
-    (http::StatusCode::NOT_FOUND, "404 not found")
+    (
+        http::StatusCode::NOT_FOUND,
+        [(
+            http::header::CONTENT_TYPE,
+            http::header::HeaderValue::from_static(mime::APPLICATION_JSON.as_ref()),
+        )],
+        r#""errors":{"msg"="404 not found"}"#,
+    )
 }

@@ -1262,6 +1262,7 @@ dependencies = [
  "futures-util",
  "http",
  "jsonwebtoken",
+ "mime",
  "once_cell",
  "rust-argon2",
  "rustls",
