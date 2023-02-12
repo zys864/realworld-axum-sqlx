@@ -1,9 +1,6 @@
 use http::{HeaderValue, Request};
 
-
-use tower_http::request_id::{
-    MakeRequestId, RequestId,
-};
+use tower_http::request_id::{MakeRequestId, RequestId};
 
 // A `MakeRequestId` that generate uuid
 #[derive(Clone, Default)]

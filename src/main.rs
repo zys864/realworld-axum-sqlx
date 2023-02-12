@@ -11,7 +11,6 @@ use utils::log_utils::log_init;
 use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::Span;
 
-use crate::utils::trace_id::TraceId;
 pub mod auth;
 pub mod db;
 pub mod error;
@@ -60,7 +59,9 @@ async fn main() {
                     },
                 )
                 .on_failure(
-                    |_error: ServerErrorsFailureClass, _latency: Duration, _span: &Span| {
+                    |_error: ServerErrorsFailureClass,
+                     _latency: Duration,
+                     _span: &Span| {
                         tracing::debug!("something went wrong")
                     },
                 ),

@@ -23,9 +23,16 @@ pub fn app_router(db_pool: DbPool) -> Router {
         .route("/users/login", post(user::login_user))
         .route("/user", get(user::get_current_user).put(user::update_user));
     let router = user_router.merge(article_router);
-    Router::new().nest("/api", router).with_state(state)
+    Router::new()
+        .nest("/api", router)
+        .with_state(state)
+        .fallback(handler_404)
 }
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub db: DbPool,
+}
+
+async fn handler_404() -> impl axum::response::IntoResponse {
+    (http::StatusCode::NOT_FOUND, "404 not found")
 }
