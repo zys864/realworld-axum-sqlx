@@ -5,7 +5,7 @@ For more information on how to this works with other frontends/backends, head ov
 
 
 # Cargo build
-
+docker run -d --name postgres-14 -p 5432:5432 -e POSTGRES_PASSWORD=password postgres:14
 > Change postgres database url in .env file 
 >
 > Run `cargo install sqlx-cli` if not install it

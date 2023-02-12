@@ -1,7 +1,7 @@
 use crate::error::ErrorKind;
 use axum::{
     async_trait,
-    extract::{FromRequest, RequestParts, TypedHeader},
+    extract::{FromRequestParts, TypedHeader},
     headers::{authorization::Bearer, Authorization},
 };
 use jsonwebtoken::{decode, DecodingKey, EncodingKey, Header, Validation};
@@ -34,17 +34,21 @@ pub fn generate_jwt_token(claims: Claims) -> jsonwebtoken::errors::Result<String
     // Create the authorization token
     jsonwebtoken::encode(&Header::default(), &claims, &KEYS.encoding)
 }
+
 #[async_trait]
-impl<B> FromRequest<B> for Claims
+impl<S> FromRequestParts<S> for Claims
 where
-    B: Send,
+    S: Send + Sync,
 {
     type Rejection = ErrorKind;
 
-    async fn from_request(req: &mut RequestParts<B>) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
         // Extract the token from the authorization header
         let TypedHeader(Authorization(bearer)) =
-            TypedHeader::<Authorization<Bearer>>::from_request(req)
+            TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state)
                 .await
                 .map_err(|_| {
                     jsonwebtoken::errors::Error::from(

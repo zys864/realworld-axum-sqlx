@@ -1,20 +1,17 @@
+use std::sync::Arc;
+
+use axum::debug_handler;
 use axum::{
-    extract::{Extension, Query, TypedHeader, Path},
-    Json, headers::authorization::Bearer,
+    extract::{Path, Query, State},
+    Json,
 };
-// use axum_debug::debug_handler;
-use axum_macros::debug_handler;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use sqlx::{ PgPool};
 use validator::Validate;
 
-use crate::{
-    auth::is_auth,
-    error::ErrorKind,
-    jwt::Claims,
-    response_type,
-};
+use crate::{error::ErrorKind, response_type, utils::jwt::Claims};
+
+use super::AppState;
 
 // *****************************************************************************
 #[derive(Debug, Deserialize, Validate)]
@@ -53,16 +50,11 @@ struct ArticleDbRerurn {
 #[debug_handler]
 pub async fn list_most_recent_articles(
     Query(req): Query<ArticleQuery>,
-    TypedHeader(auth_info): TypedHeader<axum::headers::Authorization<Bearer>>,
-    Extension(db): Extension<PgPool>,
+    State(state): State<Arc<AppState>>,
+    claims: Claims,
 ) -> Result<Json<response_type::ArticlesResponse>, ErrorKind> {
     req.validate()?;
-    let is_auth = is_auth(auth_info).ok();
-    let email = if let Some(claims) = is_auth {
-        Some(claims.sub)
-    } else {
-        None
-    };
+    let email = claims.sub;
     let auth_articles = sqlx::query_as!(ArticleDbRerurn,
     r#"
     SELECT slug as "slug!",title as "title!",description,body as "body!",
@@ -73,7 +65,7 @@ pub async fn list_most_recent_articles(
         ,$2,$3,$4,$5,$6)
     "#,
     email,req.tag,req.author,req.favorited,req.limit,req.offset
-    ).fetch_all(&db)
+    ).fetch_all(&state.db)
     .await?;
 
     let sql_articles: Vec<response_type::Article> = auth_articles
@@ -116,9 +108,9 @@ pub struct CreateArticleRequest {
     taglist: Vec<String>,
 }
 pub async fn create_article(
-    Json(req): Json<CreateArticleRequest>,
     claims: Claims,
-    Extension(db): Extension<PgPool>,
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<CreateArticleRequest>,
 ) -> Result<Json<response_type::ArticleResponse>, ErrorKind> {
     let email = claims.sub;
     let slug = req.title.replace(' ', "_");
@@ -129,7 +121,7 @@ pub async fn create_article(
     "#,
         &email
     )
-    .fetch_one(&db)
+    .fetch_one(&state.db)
     .await?;
     let article = sqlx::query!(
         r#"
@@ -144,7 +136,7 @@ pub async fn create_article(
         &req.taglist,
         &user_info.user_id
     )
-    .fetch_one(&db)
+    .fetch_one(&state.db)
     .await?;
     let article_response = response_type::Article {
         slug,
@@ -169,13 +161,13 @@ pub async fn create_article(
 }
 // *****************************************************************************
 
-
 pub async fn get_article(
     Path(slug): Path<String>,
-    Extension(db): Extension<PgPool>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<response_type::ArticleResponse>, ErrorKind> {
-    let article = sqlx::query_as!(ArticleDbRerurn,
-    r#"SELECT slug,title,description,body,taglist,createdat,updatedat,
+    let article = sqlx::query_as!(
+        ArticleDbRerurn,
+        r#"SELECT slug,title,description,body,taglist,createdat,updatedat,
     True as "favorited!",username,bio,image,true as "following!",
     (SELECT count(*) FROM favorites 
     WHERE favorites.article = article.article_id) as "favoritescount!:i32"
@@ -184,9 +176,9 @@ pub async fn get_article(
     "#,
         slug
     )
-    .fetch_one(&db)
+    .fetch_one(&state.db)
     .await?;
-    
+
     let article_response = response_type::Article {
         slug,
         title: article.title,

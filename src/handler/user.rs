@@ -1,15 +1,17 @@
+use std::sync::Arc;
+
 use crate::{
-    db::{hash, verify_hash},
+    auth::{hash, verify_hash},
     error::ErrorKind,
-    jwt::{generate_jwt_token, Claims},
+    handler::AppState,
+    utils::jwt::{generate_jwt_token, Claims},
 };
+use axum::debug_handler;
 use axum::{
-    extract::{Extension, TypedHeader},
+    extract::{State, TypedHeader},
     Json,
 };
-use axum_macros::debug_handler;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
 use validator::Validate;
 
 use crate::{error::Result, response_type};
@@ -28,8 +30,8 @@ pub struct UserCreateRequest {
 }
 #[debug_handler]
 pub async fn create_user(
+    State(state): State<Arc<AppState>>,
     Json(user_create_request): Json<UserCreateRequest>,
-    Extension(db): Extension<PgPool>,
 ) -> Result<Json<response_type::UserAuthResponse>> {
     let user_create = user_create_request.user;
     // determine user create info validation
@@ -43,7 +45,7 @@ pub async fn create_user(
     "#,
         user_create.email
     )
-    .fetch_optional(&db)
+    .fetch_optional(&state.db)
     .await?;
     tracing::debug!("email featch result {:#?}", res);
     if let Some(record) = res {
@@ -62,9 +64,9 @@ pub async fn create_user(
         &user_create.email,
         &hashed_password
     )
-    .fetch_one(&db)
+    .fetch_one(&state.db)
     .await?;
-    let claims = crate::jwt::Claims::new(user_create.email.clone());
+    let claims = Claims::new(user_create.email.clone());
     let token = generate_jwt_token(claims)?;
     let user_info = response_type::User {
         username: user_create.username,
@@ -91,26 +93,30 @@ pub struct LoginUserResquest {
 
 #[debug_handler]
 pub async fn login_user(
-    Json(user_login): Json<LoginUserResquest>,
-    Extension(db): Extension<PgPool>,
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<LoginUserResquest>,
 ) -> Result<Json<response_type::UserAuthResponse>> {
-    let LoginUser { email, password } = user_login.user;
-
+    // Check if the user sent the credentials
+    let LoginUser { email, password } = payload.user;
+    if email.is_empty() || password.is_empty() {
+        return Err(ErrorKind::Unauthorized);
+    }
+    // Here you can check the user credentials from a database
     let res = sqlx::query!(
         r#"
-        SELECT email,username,hashed_password FROM user_info
-        WHERE email = $1
-        "#,
+            SELECT email,username,hashed_password FROM user_info
+            WHERE email = $1
+            "#,
         &email
     )
-    .fetch_optional(&db)
+    .fetch_optional(&state.db)
     .await?;
     match res {
         Some(record) => {
             let is_auth = verify_hash(password, record.hashed_password)
                 .map_err(|_| ErrorKind::Unauthorized)?;
             if is_auth {
-                let claims = crate::jwt::Claims::new(record.email.clone());
+                let claims = Claims::new(record.email.clone());
                 let token = generate_jwt_token(claims)?;
                 let user_info = response_type::User {
                     username: record.username,
@@ -134,10 +140,10 @@ pub async fn login_user(
 #[debug_handler]
 pub async fn get_current_user(
     claims: Claims,
+    State(state): State<Arc<AppState>>,
     TypedHeader(bearer): TypedHeader<
         axum::headers::Authorization<axum::headers::authorization::Bearer>,
     >,
-    Extension(db): Extension<PgPool>,
 ) -> Result<Json<response_type::UserAuthResponse>> {
     let token = bearer.token().to_string();
     let user_email = claims.sub; // email
@@ -149,7 +155,7 @@ pub async fn get_current_user(
         "#,
         &user_email,
     )
-    .fetch_one(&db)
+    .fetch_one(&state.db)
     .await?;
     let user = response_type::User {
         username: record.username,
@@ -185,8 +191,9 @@ pub struct UpdateUserRequest {
 #[debug_handler]
 pub async fn update_user(
     _claims: Claims,
+
+    State(state): State<Arc<AppState>>,
     Json(update_user_info): Json<UpdateUserRequest>,
-    Extension(db): Extension<PgPool>,
 ) -> Result<Json<response_type::UserAuthResponse>> {
     let update_user = update_user_info.user;
     // determine user create info validation
@@ -205,9 +212,9 @@ pub async fn update_user(
         update_user.bio,
         update_user.image
     )
-    .fetch_one(&db)
+    .fetch_one(&state.db)
     .await?;
-    let claims = crate::jwt::Claims::new(update_user.email.clone());
+    let claims = Claims::new(update_user.email.clone());
     let token = generate_jwt_token(claims)?;
     let user_info = response_type::User {
         username: update_user.username,

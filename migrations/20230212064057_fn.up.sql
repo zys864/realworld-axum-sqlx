@@ -1,3 +1,4 @@
+-- Add up migration script here
 CREATE OR REPLACE FUNCTION list_recent_article( user_id_ BIGINT, tag_ TEXT, 
 author_ TEXT, favorited_ BOOLEAN, limit_ BIGINT, offset_ BIGINT) RETURNS 
 TABLE( slug TEXT, title TEXT, description TEXT, body TEXT, taglist TEXT[], 
@@ -36,3 +37,35 @@ AS $$
             OFFSET
                 NULLIF(offset_,0)
 $$ LANGUAGE SQL;
+
+
+CREATE OR REPLACE FUNCTION get_user_base_info_by_user_id(id BIGINT) RETURNS
+TABLE (
+    username TEXT,
+    bio TEXT,
+    image TEXT
+) AS
+$$
+    SELECT
+        username,bio,image
+    FROM 
+        user_info
+    WHERE
+        user_info.user_id = id   
+$$
+LANGUAGE SQL;
+CREATE OR REPLACE FUNCTION get_user_base_info_by_user_email(email TEXT) RETURNS
+TABLE (
+    username TEXT,
+    bio TEXT,
+    image TEXT
+) AS
+$$
+    SELECT
+        username,bio,image
+    FROM 
+        user_info
+    WHERE
+        user_info.email = email   
+$$
+LANGUAGE SQL;

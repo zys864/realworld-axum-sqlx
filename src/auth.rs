@@ -1,64 +1,44 @@
-use crate::error::ErrorKind;
-use crate::jwt::KEYS;
-use axum::{
-    body::Body,
-    extract::{FromRequest, RequestParts, TypedHeader},
-    headers::{authorization::Bearer, Authorization},
-};
-use futures_util::future::BoxFuture;
-use http::{Request, Response, StatusCode};
-use jsonwebtoken::{decode, Validation};
-use tower_http::auth::AsyncAuthorizeRequest;
+use argon2::{self, Config, ThreadMode, Variant, Version};
+use once_cell::sync::Lazy;
+// encrypt
 
-use crate::jwt::Claims;
-#[derive(Clone, Copy)]
-pub struct MyAuth;
-
-impl<B> AsyncAuthorizeRequest<B> for MyAuth
+static ARGON2_CONFIG: Lazy<Config> = Lazy::new(|| Config {
+    variant: Variant::Argon2i,
+    version: Version::Version13,
+    mem_cost: 65536,
+    time_cost: 10,
+    lanes: 4,
+    thread_mode: ThreadMode::Parallel,
+    secret: &[],
+    ad: &[],
+    hash_length: 32,
+});
+static SALT: Lazy<String> =
+    Lazy::new(|| std::env::var("SALT").expect("salt env not be seted"));
+pub fn hash(password: impl AsRef<str>) -> argon2::Result<String> {
+    argon2::hash_encoded(
+        password.as_ref().as_bytes(),
+        SALT.as_bytes(),
+        &ARGON2_CONFIG,
+    )
+}
+pub fn verify_hash<T>(password: T, hash: T) -> argon2::Result<bool>
 where
-    B: Send + Sync + 'static,
+    T: AsRef<str>,
 {
-    type RequestBody = B;
-    type ResponseBody = axum::body::Body;
-    type Future = BoxFuture<'static, Result<Request<B>, Response<Self::ResponseBody>>>;
+    argon2::verify_encoded(hash.as_ref(), password.as_ref().as_bytes())
+}
 
-    fn authorize(&mut self, request: Request<B>) -> Self::Future {
-        Box::pin(async {
-            if let Ok(req) = check_auth(request).await {
-                Ok(req)
-            } else {
-                let unauthorized_response = Response::builder()
-                    .status(StatusCode::UNAUTHORIZED)
-                    .body(Body::empty())
-                    .unwrap();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-                Err(unauthorized_response)
-            }
-        })
+    #[test]
+    fn test_hash() {
+        std::env::set_var("SALT", "dsdsdweasff");
+        let password = "password".to_string();
+        let hashed_password = hash(password.clone()).unwrap();
+        let match_result = verify_hash(password, hashed_password).unwrap();
+        assert!(match_result)
     }
-}
-async fn check_auth<B>(request: Request<B>) -> Result<Request<B>, ErrorKind>
-where
-    B: Send,
-{
-    // Extract the token from the authorization header
-    let mut req = RequestParts::new(request);
-    let TypedHeader(Authorization(bearer)) =
-        TypedHeader::<Authorization<Bearer>>::from_request(&mut req)
-            .await
-            .map_err(|_| ErrorKind::Unauthorized)?;
-
-    // Decode the user data
-    let _token_data =
-        decode::<Claims>(bearer.token(), &KEYS.decoding, &Validation::default())?;
-
-    Ok(req
-        .try_into_request()
-        .map_err(|_| ErrorKind::Unauthorized)?)
-}
-
-pub fn is_auth(auth_info: axum::headers::Authorization<Bearer>) -> Result<Claims, ErrorKind> {
-    let token = auth_info.token();
-    let token_data = decode::<Claims>(token, &KEYS.decoding, &Validation::default())?;
-    Ok(token_data.claims)
 }
