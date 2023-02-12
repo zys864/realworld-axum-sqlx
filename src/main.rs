@@ -2,7 +2,7 @@ use axum::body::Body;
 use axum::body::Bytes;
 use axum::headers::HeaderMap;
 use http::Request;
-use http::Response;
+
 use std::time::Duration;
 use tower::ServiceBuilder;
 use tower_http::ServiceBuilderExt;
@@ -10,6 +10,8 @@ use utils::log_utils::log_init;
 
 use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::Span;
+
+use crate::utils::trace_id::TraceId;
 pub mod auth;
 pub mod db;
 pub mod error;
@@ -28,10 +30,9 @@ async fn main() {
         // .timeout(std::time::Duration::from_secs(10))
         .compression()
         .trim_trailing_slash()
-        .propagate_x_request_id()
         .layer(
             TraceLayer::new_for_http()
-                .make_span_with(|request: &Request<Body>| {
+                .make_span_with(|_request: &Request<Body>| {
                     tracing::info_span!("http-request")
                 })
                 .on_request(|request: &Request<Body>, _span: &Span| {
@@ -46,20 +47,20 @@ async fn main() {
                     // |response: &Response<Body>, latency: Duration, _span: &Span| {
                     //     tracing::debug!("response generated in {:?}", latency)
                     // },
-                    ()
+                    (),
                 )
-                .on_body_chunk(|chunk: &Bytes, latency: Duration, _span: &Span| {
+                .on_body_chunk(|chunk: &Bytes, _latency: Duration, _span: &Span| {
                     tracing::debug!("sending {} bytes", chunk.len())
                 })
                 .on_eos(
-                    |trailers: Option<&HeaderMap>,
+                    |_trailers: Option<&HeaderMap>,
                      stream_duration: Duration,
                      _span: &Span| {
                         tracing::debug!("stream closed after {:?}", stream_duration)
                     },
                 )
                 .on_failure(
-                    |error: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
+                    |_error: ServerErrorsFailureClass, _latency: Duration, _span: &Span| {
                         tracing::debug!("something went wrong")
                     },
                 ),
@@ -71,5 +72,3 @@ async fn main() {
         .await
         .unwrap();
 }
-
-
